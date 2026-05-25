@@ -16,7 +16,7 @@ struct App {
 
 #[derive(Default, Debug)]
 struct TodoList {
-    items: LinkedList<TodoItem>,
+    items: Vec<TodoItem>,
     state: ListState
 }
 
@@ -55,13 +55,13 @@ impl FromIterator<(&'static str, &'static str, Status)> for TodoList {
 impl TodoList {
     fn default() -> Self {
         TodoList {
-            items: LinkedList::new(),
+            items: Vec::new(),
             state: ListState::default()
         }
     }
 
-    fn remove_task(&mut self) {
-
+    fn remove_task(&mut self, i: usize) {
+        self.items.remove(i);
     }
 
     fn add_task(&mut self) {
@@ -74,6 +74,12 @@ impl TodoList {
     fn prev_item(&mut self) {
 
     }
+
+
+    fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
+        //Returns the ith item as a mutable reference
+        self.items.get_mut(i)
+    }
 }
 
 impl TodoItem {
@@ -84,6 +90,13 @@ impl TodoItem {
             status
         }
     }
+    
+    fn change_status(&mut self) {
+        match self.status {
+            Status::Todo => self.status = Status::Complete,
+            Status::Complete => self.status = Status::Todo
+        }
+    }
 }
 
 impl Default for App {
@@ -91,7 +104,7 @@ impl Default for App {
         Self {
             list: TodoList::from_iter([
                 ("Task 1", "info 1", Status::Todo),
-                ("Task 2", "info 2", Status::Todo),
+                ("Task 2", "info 2", Status::Complete),
             ]),
             running: false    
         }
@@ -105,15 +118,24 @@ impl Widget for &mut App {
             Constraint::Fill(1)
         ]);
         let [list_area, tab_area] = area.layout(&main_layout);
-        App::render_list(list_area, buf);
+        self.render_list(list_area, buf);
         App::render_tab(tab_area, buf);
     }
 }
 
 impl App {
-    fn render_list(area: Rect, buf: &mut Buffer) {
+    fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered();
-        Paragraph::new("there are a lot of peope").block(block).render(area, buf);
+        let list_items: Vec<ListItem> = self.list
+            .items
+            .iter()
+            .map(|item| ListItem::from(item))
+            .collect();
+        let list = List::new(list_items)
+            .block(block)
+            .highlight_symbol(">");
+        StatefulWidget::render(list, area, buf, &mut self.list.state);
+
     }
 
 
@@ -132,7 +154,8 @@ impl App {
     }
     fn render_tab_info(area: Rect, buf: &mut Buffer) {
         let block = Block::bordered();
-        Paragraph::new("A lot of text will go here just to describe what is happening").block(block).render(area, buf);
+        Paragraph::new("A lot of text will go here just to describe what is happening")
+            .block(block).render(area, buf);
 
     }
 
@@ -158,7 +181,13 @@ impl App {
     fn handle_key_events(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.quit(),
-            //Move through list
+            KeyCode::Char('j') => self.select_next(),
+            KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Char('g') => self.select_first(),
+            KeyCode::Char('G') => self.select_last(),
+            KeyCode::Char('h') => self.select_none(),
+            KeyCode::Enter => self.change_status(),
+            KeyCode::Char('x') => self.remove_task(),
             //Adding items
             //Removing items
             _ => {}
@@ -168,6 +197,51 @@ impl App {
     fn quit(&mut self) {
         self.running = false;
     }
+    
+    fn remove_task(&mut self) {
+        if let Some(i) = self.list.state.selected() {
+                self.list.remove_task(i)
+        }
+    }
+
+    fn view_info(&mut self) {
+
+    }
+
+    fn select_first(&mut self) {
+        self.list.state.select_first();
+    }
+    fn select_last(&mut self) {
+        self.list.state.select_last();
+    }
+    fn select_next(&mut self) {
+        self.list.state.select_next();
+    }
+    fn select_previous(&mut self) {
+        self.list.state.select_previous();
+    }
+    fn select_none(&mut self) {
+        self.list.state.select(None);
+    }
+    fn change_status(&mut self) {
+        if let Some(i) = self.list.state.selected() {
+            match self.list.get_item(i) {
+                Some(item) => {
+                    item.change_status();
+                },
+                None => {} 
+            }
+        }
+    }
 }
 
+impl From<&TodoItem> for ListItem<'_> {
+    fn from(value: &TodoItem) -> Self {
+        let line = match value.status {
+            Status::Todo => format!("- {}", value.name),
+            Status::Complete => format!("+ {}", value.name)
+        };
+        ListItem::new(line)
 
+    }
+}
