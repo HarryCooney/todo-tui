@@ -1,8 +1,8 @@
-use std::collections::LinkedList;
+use std::env::args;
 use color_eyre::Result;
 use ratatui::DefaultTerminal;
-use ratatui::widgets::{Widget, StatefulWidget, Block, Borders, 
-    Paragraph, List, ListItem, ListState};
+use ratatui::widgets::{Widget, StatefulWidget, Block,
+    Paragraph, List, ListItem, ListState, Wrap, Padding};
 use ratatui::layout::{Layout, Rect, Constraint, Direction};
 use ratatui::text::Line;
 use ratatui::buffer::Buffer;
@@ -11,6 +11,7 @@ use std::io;
 #[derive(Debug)]
 struct App {
     list: TodoList,
+    task_buffer: TaskBuffer,
     running: bool
 }
 
@@ -27,6 +28,16 @@ struct TodoItem {
     status: Status
 }
 
+//TODO
+//It seems possible to improve this, maybe just add a reference to a single task in main App struct
+//with a lifetime or something like that... but that's for another day
+#[derive(Default, Debug)]
+struct TaskBuffer {
+    task_title: String,
+    task_info: String,
+    current_task: Option<usize>
+}
+
 #[derive(Debug)]
 enum Status {
     Todo,
@@ -34,8 +45,11 @@ enum Status {
 }
 
 fn main() -> Result<()> {
-
     color_eyre::install()?;
+    let args:Vec<String> = args().collect();
+    if args.len() > 1 {
+        return exec_args(&args);
+    }
     ratatui::run(|terminal| App::default().run(terminal))
 }
 
@@ -59,22 +73,21 @@ impl TodoList {
             state: ListState::default()
         }
     }
-
+    //TODO
+    //This seems to work but I should probably test it better
+    //If first item of list is removed and list has more than one item, it might select last item
+    //in list. I might do something about that
     fn remove_task(&mut self, i: usize) {
+        if self.items.len() == 1 {
+            self.state.select(None);
+        } else {
+            self.state.select_previous();
+        }
         self.items.remove(i);
     }
 
     fn add_task(&mut self) {
     }
-
-    fn next_item(&mut self) {
-
-    }
-
-    fn prev_item(&mut self) {
-
-    }
-
 
     fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
         //Returns the ith item as a mutable reference
@@ -103,10 +116,13 @@ impl Default for App {
     fn default() -> Self {
         Self {
             list: TodoList::from_iter([
-                ("Task 1", "info 1", Status::Todo),
-                ("Task 2", "info 2", Status::Complete),
+                ("Task 1",
+                "This will contain info about the first task, whatever that might be. Basically this text is just here to fill up space and ensure that everything is formatting correctly and that the text is being contained within the border. Also, when I switch to another task I want to make sure that the corresponding text for that task also displays properly so I will write something for the other task",
+                 Status::Todo),
+                ("Task 2", "Lorem ipsum dolor sit amet consectetur adipiscing elit. Quisque faucibus ex sapien vitae pellentesque sem placerat. In id cursus mi pretium tellus duis convallis. Tempus leo eu aenean sed diam urna tempor. Pulvinar vivamus fringilla lacus nec metus bibendum egestas. Iaculis massa nisl malesuada lacinia integer nunc posuere. Ut hendrerit semper vel class aptent taciti sociosqu. Ad litora torquent per conubia nostra inceptos himenaeos.", Status::Complete),
             ]),
-            running: false    
+            task_buffer: TaskBuffer::default(),
+            running: false
         }
     }
 }
@@ -119,9 +135,10 @@ impl Widget for &mut App {
         ]);
         let [list_area, tab_area] = area.layout(&main_layout);
         self.render_list(list_area, buf);
-        App::render_tab(tab_area, buf);
+        self.render_tab(tab_area, buf);
     }
 }
+
 
 impl App {
     fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
@@ -139,24 +156,25 @@ impl App {
     }
 
 
-    fn render_tab(area: Rect, buf: &mut Buffer) {
+    fn render_tab(&self, area: Rect, buf: &mut Buffer) {
         let tab_layout = Layout::vertical([
             Constraint::Length(3),
             Constraint::Fill(1)
         ]);
         let [tab_title_layout, tab_info_layout] = area.layout(&tab_layout);
-        App::render_tab_title(tab_title_layout, buf);
-        App::render_tab_info(tab_info_layout, buf);
+        self.render_tab_title(tab_title_layout, buf);
+        self.render_tab_info(tab_info_layout, buf);
     }
-    fn render_tab_title(area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered();
-        Paragraph::new("Title here").block(block).render(area, buf);
+    fn render_tab_title(&self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered().padding(Padding::horizontal(1));
+        Paragraph::new(self.task_buffer.task_title.to_owned()).block(block).render(area, buf)
     }
-    fn render_tab_info(area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered();
-        Paragraph::new("A lot of text will go here just to describe what is happening")
-            .block(block).render(area, buf);
 
+    fn render_tab_info(&self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered().padding(Padding::horizontal(1));
+        Paragraph::new(self.task_buffer.task_info.to_owned())
+            .wrap(Wrap {trim: true})
+            .block(block).render(area, buf)
     }
 
     fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -186,10 +204,9 @@ impl App {
             KeyCode::Char('g') => self.select_first(),
             KeyCode::Char('G') => self.select_last(),
             KeyCode::Char('h') => self.select_none(),
-            KeyCode::Enter => self.change_status(),
+            KeyCode::Enter => self.handle_enter(),
             KeyCode::Char('x') => self.remove_task(),
             //Adding items
-            //Removing items
             _ => {}
         }
     }
@@ -200,12 +217,33 @@ impl App {
     
     fn remove_task(&mut self) {
         if let Some(i) = self.list.state.selected() {
-                self.list.remove_task(i)
+                self.list.remove_task(i);
+                self.update_task_buffer();
         }
     }
 
-    fn view_info(&mut self) {
+    fn update_task_buffer(&mut self) {
+        match self.list.state.selected() {
+            Some(i) => {
+                self.task_buffer.task_title = self.list.items[i].name.to_owned();
+                self.task_buffer.task_info = self.list.items[i].info.to_owned();
+                self.task_buffer.current_task = self.list.state.selected()
+            }
+            None => {
+                self.task_buffer.task_title = String::from("");
+                self.task_buffer.task_info = String::from("");
+                self.task_buffer.current_task = None
+            }
+        }
+    }
 
+    fn handle_enter(&mut self) {
+        //If the task being selected is the task in task_buffer, It will change status
+        if self.task_buffer.current_task == self.list.state.selected() {
+            self.change_status();
+        } else {
+            self.update_task_buffer();
+        }
     }
 
     fn select_first(&mut self) {
@@ -244,4 +282,30 @@ impl From<&TodoItem> for ListItem<'_> {
         ListItem::new(line)
 
     }
+}
+
+fn exec_args(args: &Vec<String>) -> Result<()> {
+    for arg in args.iter().skip(1) {
+        if arg == "help" {
+            help_info();
+        } 
+        else {
+            panic!("Invalid argument: {arg}");
+        }
+    }
+    Ok(())
+}
+
+fn help_info() {
+    println!("
+    Hello! Welcome to my Tuido app (The i is silent)
+    These are the controls, I hope they work for you!\n
+    q - Quit app
+    k - Select previous task in list
+    j - Select next task list
+    x - Delete task
+    g - Select first task in list
+    G - Select last task in list
+    h - Deselect current task
+    ENTER - Toggle item as complete or todo");
 }
