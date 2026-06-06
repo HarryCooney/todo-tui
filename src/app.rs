@@ -3,15 +3,17 @@ use serde::{Deserialize, Serialize};
 use color_eyre::Result;
 use serde_json::{Value, Error};
 use std::io;
-use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode};
+use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifiers};
 use ratatui::widgets::{ListItem, ListState};
-use std::fs::File;
 use std::fs;
 
 #[derive(Debug)]
 pub struct App {
     pub list: TodoList,
     pub task_buffer: TaskBuffer,
+    //Might have to change this later if I chage how it works
+    //Keep simple for now, allow for scalability
+    pub command_message: String,
     pub running: bool
 }
 
@@ -83,26 +85,18 @@ impl TodoList {
     fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
         //Returns the ith item as a mutable reference
         self.items.get_mut(i)
-    }
+   }
     //TODO
     //Test this
-    pub fn serialize(&self) -> Result<()> {
-        let t = serde_json::to_string_pretty(&self.items)?;
-        println!("{}", t);
-        Ok(())
+    pub fn serialize(&self) -> Result<String, Error> {
+        serde_json::to_string_pretty(&self.items)
     }
     
-    //TODO
-    //Test that this works
-    fn write_list_to_file(data: &str) -> Result<()> {
-         let file = "test.json";
-         fs::write(file, data)?;
-         Ok(())
-    }
     
     //TODO
     //Read into String format
-    fn read_list_from_file() {}
+    fn read_list_from_file() {
+    }
 }
 
 impl TodoItem {
@@ -143,7 +137,8 @@ impl Default for App {
                  Status::Todo)
             ]),
             task_buffer: TaskBuffer::default(),
-            running: false
+            command_message: String::from(""),
+            running: false,
         }
     }
 }
@@ -161,23 +156,38 @@ impl App {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_events(key_event);
-            }
+            },
+            Event::Key(key_event) if key_event.kind == KeyEventKind::Press &&
+                key_event.modifiers == KeyModifiers::CONTROL => {
+                self.handle_command_events(key_event);   
+            },
             _ => {}
         }
         Ok(())
     }
     
     fn handle_key_events(&mut self, key_event: KeyEvent) {
+        if key_event.modifiers == KeyModifiers::CONTROL {
+            self.handle_command_events(key_event);
+        } else {
+            match key_event.code {
+                KeyCode::Char('q') => self.quit(),
+                KeyCode::Char('j') => self.select_next(),
+                KeyCode::Char('k') => self.select_previous(),
+                KeyCode::Char('g') => self.select_first(),
+                KeyCode::Char('G') => self.select_last(),
+                KeyCode::Char('h') => self.select_none(),
+                KeyCode::Enter => self.handle_enter(),
+                KeyCode::Char('x') => self.remove_task(),
+                //Adding items
+                _ => {}
+            }
+        }
+    }
+
+    fn handle_command_events(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Char('q') => self.quit(),
-            KeyCode::Char('j') => self.select_next(),
-            KeyCode::Char('k') => self.select_previous(),
-            KeyCode::Char('g') => self.select_first(),
-            KeyCode::Char('G') => self.select_last(),
-            KeyCode::Char('h') => self.select_none(),
-            KeyCode::Enter => self.handle_enter(),
-            KeyCode::Char('x') => self.remove_task(),
-            //Adding items
+            KeyCode::Char('s') => self.save_list(),
             _ => {}
         }
     }
@@ -237,6 +247,23 @@ impl App {
                 },
                 None => {} 
             }
+        }
+    }
+
+    //TODO
+    //Test that this works
+    fn write_list_to_file(data: &str) -> Result<()> {
+         let file = "test.json";
+         fs::write(file, data)?;
+         Ok(())
+    }
+    fn save_list(&mut self) {
+        match self.list.serialize() {
+            Ok(json) => match App::write_list_to_file(&json) {
+                Ok(()) => self.command_message = String::from("List saved"),
+                Err(_) => self.command_message = String::from("Error: Save file failed")
+            },
+            Err(_) => self.command_message = String::from("Error: Save file failed")
         }
     }
 }

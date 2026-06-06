@@ -1,18 +1,26 @@
 use ratatui::widgets::{Widget, StatefulWidget, Block,
     Paragraph, List, ListItem, Wrap, Padding};
-use ratatui::layout::{Layout, Rect, Constraint};
+use ratatui::layout::{Layout, Rect, Constraint, Direction};
 use ratatui::buffer::Buffer;
 use crate::app;
 
 impl Widget for &mut app::App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let main_layout = Layout::horizontal([
-            Constraint::Length(40),
-            Constraint::Fill(1)
-        ]);
-        let [list_area, tab_area] = area.layout(&main_layout);
-        self.render_list(list_area, buf);
-        self.render_tab(tab_area, buf);
+        let frame_area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(1)
+            ]).split(area);
+        let main_area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(40),
+                Constraint::Fill(1)
+            ]).split(frame_area[0]);
+        self.render_list(main_area[0], buf);
+        self.render_tab(main_area[1], buf);
+        self.render_command(frame_area[1], buf);
     }
 }
 
@@ -29,9 +37,14 @@ impl app::App {
             .block(block)
             .highlight_symbol("> ");
         StatefulWidget::render(list, area, buf, &mut self.list.state);
-
     }
 
+    fn render_command(&self, area: Rect, buf: &mut Buffer) {
+        let padding = Block::new().padding(Padding::horizontal(1));
+        let message = Paragraph::new(self.command_message.to_owned())
+            .block(padding);
+        message.render(area, buf);
+    }
 
     fn render_tab(&self, area: Rect, buf: &mut Buffer) {
         let tab_layout = Layout::vertical([
@@ -42,8 +55,10 @@ impl app::App {
         self.render_tab_title(tab_title_layout, buf);
         self.render_tab_info(tab_info_layout, buf);
     }
+
     fn render_tab_title(&self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered().padding(Padding::horizontal(1));
+
         match self.task_buffer.current_task {
             Some(_) => Paragraph::new(self.task_buffer.task_name.to_owned())
                 .block(block)

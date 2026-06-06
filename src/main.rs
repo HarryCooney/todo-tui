@@ -37,5 +37,6 @@ fn help_info() {
     g - Select first task in list
     G - Select last task in list
     h - Deselect current task
+    CTRL s - Save list
     ENTER - Toggle item as complete or todo");
 }
