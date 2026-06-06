@@ -1,11 +1,13 @@
 use ratatui::DefaultTerminal;
+use std::process;
 use serde::{Deserialize, Serialize};
 use color_eyre::Result;
 use serde_json::{Value, Error};
-use std::io;
+use std::io::{self, BufReader};
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifiers};
 use ratatui::widgets::{ListItem, ListState};
-use std::fs;
+use std::fs::{self, File};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct App {
@@ -95,7 +97,18 @@ impl TodoList {
     
     //TODO
     //Read into String format
-    fn read_list_from_file() {
+    pub fn read_list_from_file(&mut self, file_name: &str) -> Result<()> {
+        match File::open(file_name) {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                self.items = serde_json::from_reader(reader)?;
+            },
+            Err(e) => {
+                println!("{:?}", e);
+                process::exit(1);
+            }
+        };
+        Ok(())
     }
 }
 

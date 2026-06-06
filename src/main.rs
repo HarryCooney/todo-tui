@@ -1,29 +1,35 @@
 use std::env::args;
 use color_eyre::Result;
+use std::process;
 mod app;
 mod ui;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     let args:Vec<String> = args().collect();
+    let mut app = app::App::default();
     if args.len() > 1 {
-        return exec_args(&args);
+        exec_args(&args, &mut app);
     }
-    let test = app::App::default();
-    test.list.serialize()?;
-    ratatui::run(|terminal| test.run(terminal))
+    ratatui::run(|terminal| app.run(terminal))
 }
 
-fn exec_args(args: &Vec<String>) -> Result<()> {
+fn exec_args(args: &Vec<String>, app: &mut app::App){
     for arg in args.iter().skip(1) {
         if arg == "help" {
             help_info();
-        } 
-        else {
-            panic!("Invalid argument: {arg}");
+            process::exit(0);
+        } else if arg.ends_with(".json") { //If file is json
+            //If json can't be parsed
+            if let Err(e) = import_json_file(arg, app) {
+                println!("{:?}", e);
+                process::exit(1);
+            }
+        } else { //If arg is not valid
+            println!("ERROR: Invalid argument: {arg}");
+            process::exit(1);
         }
     }
-    Ok(())
 }
 
 fn help_info() {
@@ -38,5 +44,13 @@ fn help_info() {
     G - Select last task in list
     h - Deselect current task
     CTRL s - Save list
-    ENTER - Toggle item as complete or todo");
+    ENTER - Toggle item as complete or todo
+
+    Lists are stored in json form.
+    To load a list on start up, add the file to args");
+
+}
+
+fn import_json_file(file_name: &str, app: &mut app::App) -> Result<()> {
+    app.list.read_list_from_file(file_name)
 }
