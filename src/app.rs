@@ -2,12 +2,11 @@ use ratatui::DefaultTerminal;
 use std::process;
 use serde::{Deserialize, Serialize};
 use color_eyre::Result;
-use serde_json::{Value, Error};
+use serde_json::Error;
 use std::io::{self, BufReader};
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifiers};
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct App {
@@ -32,9 +31,6 @@ pub struct TodoItem {
     pub status: Status
 }
 
-//TODO
-//It seems possible to improve this, maybe just add a reference to a single task in main App struct
-//with a lifetime or something like that... but that's for another day
 #[derive(Default, Debug)]
 pub struct TaskBuffer {
     pub task_name: String, 
@@ -62,41 +58,47 @@ impl FromIterator<(&'static str, &'static str, Status)> for TodoList {
 }
 
 impl TodoList {
+    #[allow(dead_code)]
     fn default() -> Self {
         TodoList {
             items: Vec::new(),
             state: ListState::default()
         }
     }
-    //TODO
-    //This seems to work but I should probably test it better
-    //If first item of list is removed and list has more than one item, it might select last item
-    //in list. I might do something about that
-    fn remove_task(&mut self, i: usize) {
-        if self.items.len() == 1 {
-            self.state.select(None);
-        } else {
-            self.state.select_previous();
+    
+    ///Removes a task
+    ///
+    ///The edge case which has to be accounted for is if there are no
+    ///items left after a deletion. In this case, ListState is set to none.
+    fn remove_task(&mut self, i: Option<usize>) {
+        if let Some(i) = i {
+            if self.items.len() == 1 {
+                self.state.select(None);
+            }
+            self.items.remove(i);
         }
-        self.items.remove(i);
     }
+    /*
+     * If the item being displayed is deleted, display the next item that is selected
+     * If there is only one item in the list and it is deleted, set list.selected to None
+     * Then, flush task buffer
+     * Should all of the logic be in this?
+    */
 
+    #[allow(dead_code)]
     fn add_task(&mut self) {
     }
-
+    ///Returns the TodoItem at a given index
     fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
-        //Returns the ith item as a mutable reference
         self.items.get_mut(i)
    }
+
     //TODO
     //Test this
     pub fn serialize(&self) -> Result<String, Error> {
         serde_json::to_string_pretty(&self.items)
     }
     
-    
-    //TODO
-    //Read into String format
     pub fn read_list_from_file(&mut self, file_name: &str) -> Result<()> {
         match File::open(file_name) {
             Ok(file) => {
@@ -127,9 +129,10 @@ impl TodoItem {
             Status::Complete => self.status = Status::Todo
         }
     }
+
+    ///Serializes TodoItem to json form
     pub fn serialize(&self) -> Result<()> {
-        let todo = serde_json::to_string(self)?;
-        println!("{}", todo);
+        serde_json::to_string(self)?;
         Ok(())
     }
     pub fn deserialize(todo_item: &str) -> Result<TodoItem, serde_json::Error> {
@@ -165,6 +168,8 @@ impl App {
         }
         Ok(())
     }
+
+    /// Handles all keyboard inputs
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
@@ -208,23 +213,53 @@ impl App {
     fn quit(&mut self) {
         self.running = false;
     }
-    
+
+    ///method called when remove keybind is pressed
+    ///
+    ///Updates TodoList and TaskBuffer accordingly:
+    ///If there is only one item left in TodoList, wipe TB and TL
+    ///If the TB = currently selected and is the last item, decrement both
+    ///If the task in TB is a larger index than what is being deleted,
+    ///decrement current_task in TB.
+    ///Otherwise, just remove task and don't update TB at all.
     fn remove_task(&mut self) {
-        if let Some(i) = self.list.state.selected() {
-                self.list.remove_task(i);
-                self.update_task_buffer();
+        if self.list.state.selected() == Some(0) {
+            self.list.remove_task(self.list.state.selected());
+            self.update_task_buffer(self.list.state.selected());
+        }
+        else if self.list.state.selected() == self.task_buffer.current_task 
+        && self.list.state.selected() == Some(self.list.items.len() - 1) {
+
+            self.list.remove_task(self.list.state.selected());
+            self.select_previous();
+            self.update_task_buffer(self.list.state.selected());
+        }
+        else if self.list.state.selected() < self.task_buffer.current_task {
+            self.list.remove_task(self.list.state.selected());
+            self.task_buffer.decrement_current_task();
+        }
+        else {
+            self.list.remove_task(self.list.state.selected());
         }
     }
 
-    fn update_task_buffer(&mut self) {
-        if let Some(i) = self.list.state.selected() {
-            self.task_buffer.task_name = self.list.items[i].name.to_owned();
-            self.task_buffer.task_info = self.list.items[i].info.to_owned();
-            self.task_buffer.current_task = Some(i);
-        } else {
-            self.task_buffer.task_name = String::from("");
-            self.task_buffer.task_info = String::from("");
-            self.task_buffer.current_task = None;
+    ///Updates information in task buffer.
+    ///
+    ///This information is used to render the info tab.
+    ///The buffer is only updated if the index of the current TodoItem in TodoList
+    ///Doesn't match the item in the buffer. This saves having to clone on each frame.
+    fn update_task_buffer(&mut self, i: Option<usize>) {
+        match i {
+            Some(i) => {
+                self.task_buffer.task_name = self.list.items[i].name.to_owned();
+                self.task_buffer.task_info = self.list.items[i].info.to_owned();
+                self.task_buffer.current_task = Some(i);
+            },
+            None => {
+                self.task_buffer.task_name = String::from("");
+                self.task_buffer.task_info = String::from("");
+                self.task_buffer.current_task = None;
+            }
         }
     }
 
@@ -233,7 +268,7 @@ impl App {
         if self.task_buffer.current_task == self.list.state.selected() {
             self.change_status();
         } else {
-            self.update_task_buffer();
+            self.update_task_buffer(self.list.state.selected());
         }
     }
 
@@ -263,8 +298,6 @@ impl App {
         }
     }
 
-    //TODO
-    //Test that this works
     fn write_list_to_file(data: &str) -> Result<()> {
          let file = "test.json";
          fs::write(file, data)?;
@@ -288,5 +321,17 @@ impl From<&TodoItem> for ListItem<'_> {
             Status::Complete => format!("✓ {}", value.name)
         };
         ListItem::new(line)
+    }
+}
+
+impl TaskBuffer {
+    fn decrement_current_task(&mut self) {
+        if let Some(i) = self.current_task {
+            if i == 0 {
+                self.current_task = None;
+            } else {
+                self.current_task = Some(i - 1);
+            }
+        }
     }
 }
