@@ -7,6 +7,7 @@ use std::io::{self, BufReader};
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifiers};
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
+use crate::editor::{Editor, InputMode};
 
 #[derive(Debug)]
 pub struct App {
@@ -15,6 +16,8 @@ pub struct App {
     //Might have to change this later if I chage how it works
     //Keep simple for now, allow for scalability
     pub command_message: String,
+    pub editor: Editor,
+    pub mode: Mode,
     pub running: bool
 }
 
@@ -42,6 +45,13 @@ pub struct TaskBuffer {
 pub enum Status {
     Todo,
     Complete
+}
+
+#[derive(Debug)]
+pub enum Mode {
+    Editing,
+    Viewing,
+    SelectingFile
 }
 
 impl FromIterator<(&'static str, &'static str, Status)> for TodoList {
@@ -87,6 +97,7 @@ impl TodoList {
 
     #[allow(dead_code)]
     fn add_task(&mut self) {
+
     }
     ///Returns the TodoItem at a given index
     fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
@@ -154,6 +165,8 @@ impl Default for App {
             ]),
             task_buffer: TaskBuffer::default(),
             command_message: String::from(""),
+            editor: Editor::default(),
+            mode: Mode::Viewing,
             running: false,
         }
     }
@@ -173,40 +186,100 @@ impl App {
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_events(key_event);
+                self.handle_key_events(&key_event);
             },
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press &&
                 key_event.modifiers == KeyModifiers::CONTROL => {
-                self.handle_command_events(key_event);   
+                self.handle_command_events(&key_event);   
             },
             _ => {}
         }
         Ok(())
     }
     
-    fn handle_key_events(&mut self, key_event: KeyEvent) {
+    ///Handles all keyboard inputs.
+    ///Inputs are seperated based on the app mode for ease of readability
+    fn handle_key_events(&mut self, key_event: &KeyEvent) {
         if key_event.modifiers == KeyModifiers::CONTROL {
-            self.handle_command_events(key_event);
-        } else {
-            match key_event.code {
-                KeyCode::Char('q') => self.quit(),
-                KeyCode::Char('j') => self.select_next(),
-                KeyCode::Char('k') => self.select_previous(),
-                KeyCode::Char('g') => self.select_first(),
-                KeyCode::Char('G') => self.select_last(),
-                KeyCode::Char('h') => self.select_none(),
-                KeyCode::Enter => self.handle_enter(),
-                KeyCode::Char('x') => self.remove_task(),
-                //Adding items
-                _ => {}
+            match self.mode {
+                Mode::Viewing => self.handle_commands_viewer_events(key_event),
+                Mode::Editing => self.handle_commands_editor_events(key_event),
+                Mode::SelectingFile => self.handle_commands_file_view_events(key_event)
+            }
+        }
+        else {
+            match self.mode {
+                Mode::Viewing => self.handle_viewing_events(key_event),
+                Mode::Editing => self.handle_editor_events(key_event),
+                Mode::SelectingFile => {}
             }
         }
     }
 
-    fn handle_command_events(&mut self, key_event: KeyEvent) {
+    //TODO (Things todo might not necessarily be in this method, could also be in
+    //command_editing method)
+    //Add binds for setting normal mode
+    //add binds for inserting and deleting chars
+    fn handle_editor_events(&mut self, key_event: &KeyEvent) {
+        match self.editor.input_mode {
+            InputMode::Normal => {
+                match key_event.code {
+                    KeyCode::Char('h') => self.editor.move_cursor_left(),
+                    KeyCode::Char('l') => self.editor.move_cursor_right(),
+                    KeyCode::Tab => self.editor.switch_editing(),
+                    KeyCode::Char('i') => self.editor.input_mode = InputMode::Editing,
+                    _ => {}
+                }
+            },
+            InputMode::Editing => {
+            }
+        }
+    }
+
+    //TODO This will be used when the file viewer is added
+    fn handle_file_view_events(&mut self, key_event: &KeyEvent) {
+
+    }
+
+    fn handle_viewing_events(&mut self, key_event: &KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.quit(),
+            KeyCode::Char('j') => self.select_next(),
+            KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Char('g') => self.select_first(),
+            KeyCode::Char('G') => self.select_last(),
+            KeyCode::Char('h') => self.select_none(),
+            KeyCode::Enter => self.handle_enter(),
+            KeyCode::Char('x') => self.remove_task(),
+            _ => {}
+        }
+    }
+
+    fn handle_commands_editor_events(&mut self, key_event: &KeyEvent) {
+        //TODO Add way to get back to viewing panela (maybe using CTRL-V)
+        match key_event.code {
+            KeyCode::Char('c') => self.editor.input_mode = InputMode::Normal,
+            _ => {}
+        }
+    }
+
+    fn handle_commands_viewer_events(&mut self, key_event: &KeyEvent) {
         match key_event.code {
             KeyCode::Char('s') => self.save_list(),
+            KeyCode::Char('e') => self.switch_mode(Mode::Editing),
             _ => {}
+        }
+    }
+
+    fn handle_commands_file_view_events(&mut self, key_event: &KeyEvent) {
+
+    }
+
+    fn switch_mode(&mut self, mode: Mode) {
+        match mode {
+            Mode::Viewing => self.mode = Mode::Viewing,
+            Mode::Editing => self.mode = Mode::Editing,
+            Mode::SelectingFile => self.mode = Mode::SelectingFile
         }
     }
     

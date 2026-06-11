@@ -3,6 +3,7 @@ use color_eyre::Result;
 use std::process;
 mod app;
 mod ui;
+mod editor;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
