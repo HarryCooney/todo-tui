@@ -20,13 +20,11 @@ pub enum CurrentlyEditing {
 }
 
 impl Editor {
-    //TODO: Swap to saturating_add
     pub fn move_cursor_right(&mut self) {
-            self.char_index = self.clamp_cursor(self.char_index + 1);
+            self.char_index = self.clamp_cursor(self.char_index.saturating_add(1));
     }
-    //TODO: Swap to saturating_subtract
     pub fn move_cursor_left(&mut self) {
-            self.char_index = self.clamp_cursor(self.char_index - 1);
+            self.char_index = self.clamp_cursor(self.char_index.saturating_sub(1));
     }
 
     fn reset_cursor(&mut self) {
@@ -54,12 +52,15 @@ impl Editor {
         }
     }
 
+    //TODO Add function to change input in info_input and title_input into task structs
+
     pub fn insert_char(&mut self, input_char: char) {
         let index = self.char_index;
         match self.currently_editing {
             CurrentlyEditing::Title  => self.title_input.insert(index, input_char),
             CurrentlyEditing::Info =>  self.info_input.insert(index, input_char)
         }
+        self.move_cursor_right();
     }
     
     pub fn switch_editing(&mut self) {

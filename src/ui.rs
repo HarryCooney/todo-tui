@@ -1,8 +1,11 @@
 use ratatui::widgets::{Widget, StatefulWidget, Block,
     Paragraph, List, ListItem, Wrap, Padding};
-use ratatui::layout::{Layout, Rect, Constraint, Direction};
+use ratatui::layout::{Position, Layout, Rect, Constraint, Direction};
 use ratatui::buffer::Buffer;
+use ratatui::Frame;
+use ratatui::style::{Style, Color, Stylize, Modifier};
 use crate::app;
+use crate::editor::{Editor, InputMode, CurrentlyEditing};
 
 impl Widget for &mut app::App {
     fn render(self, area: Rect, buf: &mut Buffer) {
@@ -26,6 +29,12 @@ impl Widget for &mut app::App {
 
 
 impl app::App {
+    pub fn render(&mut self, frame: &mut Frame) {
+        frame.render_widget(&mut *self, frame.area());
+        //This is SO inefficient but I'm not sure how else to get the areas for the info and title
+        //tabs so this will have to do.
+        self.render_cursor(frame.area(), frame);
+    }
     fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered();
         let list_items: Vec<ListItem> = self.list
@@ -41,7 +50,8 @@ impl app::App {
 
     fn render_command(&self, area: Rect, buf: &mut Buffer) {
         let padding = Block::new().padding(Padding::horizontal(1));
-        let message = Paragraph::new(self.command_message.to_owned())
+        //TODO change this back once testing is done
+        let message = Paragraph::new(self.editor.title_input.to_owned())
             .block(padding);
         message.render(area, buf);
     }
@@ -56,29 +66,105 @@ impl app::App {
         self.render_tab_info(tab_info_layout, buf);
     }
 
-    fn render_tab_title(&self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered().padding(Padding::horizontal(1));
+    fn render_cursor(&mut self, input_area: Rect, frame: &mut Frame) {
+        let frame_area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Fill(1),
+                Constraint::Length(1)
+            ]).split(frame.area());
+        let tab_areas = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(40),
+                Constraint::Fill(1)
+            ]).split(frame_area[0]);
 
-        match self.task_buffer.current_task {
-            Some(_) => Paragraph::new(self.task_buffer.task_name.to_owned())
-                .block(block)
-                .render(area, buf),
-            None => Paragraph::new("")
-                .block(block)
-                .render(area, buf)
+        //This is a terrible thing.
+        match self.mode {
+            #[expect(clippy::cast_possible_truncation)]
+            app::Mode::Editing => {
+                match self.editor.currently_editing {
+                    CurrentlyEditing::Title => {
+                        frame.set_cursor_position(Position::new(
+                            tab_areas[1].x + self.editor.char_index as u16 + 2,
+                            tab_areas[1].y + 1))
+                    },
+                    CurrentlyEditing::Info => {
+                        //TODO Figure out how to get cursor working when editing a paragraph
+                        frame.set_cursor_position(Position::new(
+                                tab_areas[1].x + self.editor.char_index as u16 + 1,
+                                tab_areas[1].y + self.calculate_y_pos_for_info()))
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn calculate_y_pos_for_info(&self) -> u16 {
+        (self.editor.char_index / 60 + 4) as u16
+    }
+
+    fn render_tab_title(&self, area: Rect, buf: &mut Buffer) {
+        if let app::Mode::Editing = self.mode {
+            match self.editor.currently_editing {
+                CurrentlyEditing::Title => {
+                    let block = Block::bordered().padding(Padding::horizontal(2)).on_dark_gray();
+                    Paragraph::new(self.editor.title_input.to_owned())
+                        .wrap(Wrap {trim: true})
+                        .block(block).render(area, buf);
+                },
+                CurrentlyEditing::Info => {
+                    let block = Block::bordered().padding(Padding::horizontal(2));
+                    Paragraph::new(self.editor.title_input.to_owned())
+                        .wrap(Wrap {trim: true})
+                        .block(block).render(area, buf)
+
+                }
+            }
+        }
+        else {
+            let block = Block::bordered().padding(Padding::horizontal(1));
+            match self.task_buffer.current_task {
+                Some(_) => Paragraph::new(self.task_buffer.task_name.to_owned())
+                    .block(block)
+                    .render(area, buf),
+                None => Paragraph::new("")
+                    .block(block)
+                    .render(area, buf)
+            }
         }
     }
 
     fn render_tab_info(&self, area: Rect, buf: &mut Buffer) {
-        let block = Block::bordered().padding(Padding::horizontal(1));
+        if let app::Mode::Editing = self.mode {
+            match self.editor.currently_editing {
+                CurrentlyEditing::Info => {
+                    let block = Block::bordered().padding(Padding::horizontal(1)).on_dark_gray();
+                    Paragraph::new(self.editor.info_input.to_owned())
+                        .wrap(Wrap {trim: true})
+                        .block(block).render(area, buf)
+                },
+                CurrentlyEditing::Title => {
+                    let block = Block::bordered().padding(Padding::horizontal(1));
+                    Paragraph::new(self.editor.info_input.to_owned())
+                        .wrap(Wrap {trim: true})
+                        .block(block).render(area, buf)
 
-        match self.task_buffer.current_task {
-            Some(_) => Paragraph::new(self.task_buffer.task_info.to_owned())
-                .wrap(Wrap {trim: true})
-                .block(block).render(area, buf),
-            None => Paragraph::new("")
-                .block(block)
-                .render(area,buf)
+                }
+            }
+        }
+        else {
+            let block = Block::bordered().padding(Padding::horizontal(1));
+            match self.task_buffer.current_task {
+                Some(_) => Paragraph::new(self.task_buffer.task_info.to_owned())
+                    .wrap(Wrap {trim: true})
+                    .block(block).render(area, buf),
+                None => Paragraph::new("")
+                    .block(block)
+                    .render(area,buf)
+            }
         }
     }
 }

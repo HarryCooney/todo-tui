@@ -8,6 +8,7 @@ use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifier
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
 use crate::editor::{Editor, InputMode};
+use crate::ui;
 
 #[derive(Debug)]
 pub struct App {
@@ -176,11 +177,12 @@ impl App {
     pub fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         self.running = true;
         while self.running {
-            terminal.draw(|frame| frame.render_widget(&mut self, frame.area()))?;
+            terminal.draw(|frame| self.render(frame))?;
             self.handle_events()?;
         }
         Ok(())
     }
+
 
     /// Handles all keyboard inputs
     fn handle_events(&mut self) -> io::Result<()> {
@@ -188,15 +190,11 @@ impl App {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                 self.handle_key_events(&key_event);
             },
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press &&
-                key_event.modifiers == KeyModifiers::CONTROL => {
-                self.handle_command_events(&key_event);   
-            },
             _ => {}
         }
         Ok(())
     }
-    
+
     ///Handles all keyboard inputs.
     ///Inputs are seperated based on the app mode for ease of readability
     fn handle_key_events(&mut self, key_event: &KeyEvent) {
@@ -224,6 +222,7 @@ impl App {
         match self.editor.input_mode {
             InputMode::Normal => {
                 match key_event.code {
+                    KeyCode::Char('q') => self.quit(),
                     KeyCode::Char('h') => self.editor.move_cursor_left(),
                     KeyCode::Char('l') => self.editor.move_cursor_right(),
                     KeyCode::Tab => self.editor.switch_editing(),
@@ -232,6 +231,13 @@ impl App {
                 }
             },
             InputMode::Editing => {
+                match key_event.code {
+                    KeyCode::Char(to_insert) => self.editor.insert_char(to_insert),
+                    KeyCode::Backspace => self.editor.delete_char(),
+                    KeyCode::Enter => self.editor.insert_char('\n'),
+                    KeyCode::Tab => self.editor.insert_char('\t'),
+                    _ => {}
+                }
             }
         }
     }
@@ -256,17 +262,38 @@ impl App {
     }
 
     fn handle_commands_editor_events(&mut self, key_event: &KeyEvent) {
-        //TODO Add way to get back to viewing panela (maybe using CTRL-V)
-        match key_event.code {
-            KeyCode::Char('c') => self.editor.input_mode = InputMode::Normal,
-            _ => {}
+        match self.editor.input_mode {
+            InputMode::Normal => {
+                //When mode is switched to viewing, changes are saved from editor to the task which
+                //was being edited (if it exists)
+                if let KeyCode::Char('v') = key_event.code {
+                    self.switch_mode(Mode::Viewing);
+                    self.task_buffer.task_name = self.editor.title_input.clone();
+                    self.task_buffer.task_info = self.editor.info_input.clone();
+                    if let Some(i) = self.task_buffer.current_task {
+                        self.list.items[i].name = self.editor.title_input.clone();
+                        self.list.items[i].info = self.editor.info_input.clone();
+                    }
+                }
+            },
+            InputMode::Editing => {
+                if let KeyCode::Char('c') = key_event.code {
+                    self.editor.input_mode = InputMode::Normal;
+                }
+            }
         }
     }
 
     fn handle_commands_viewer_events(&mut self, key_event: &KeyEvent) {
         match key_event.code {
             KeyCode::Char('s') => self.save_list(),
-            KeyCode::Char('e') => self.switch_mode(Mode::Editing),
+            //When you start editing, the task buffer is loaded into the editor as the info to be
+            //edited.
+            KeyCode::Char('e') => {
+                self.switch_mode(Mode::Editing);
+                self.editor.title_input = self.task_buffer.task_name.clone();
+                self.editor.info_input = self.task_buffer.task_info.clone();
+            },
             _ => {}
         }
     }
@@ -376,6 +403,7 @@ impl App {
          fs::write(file, data)?;
          Ok(())
     }
+
     fn save_list(&mut self) {
         match self.list.serialize() {
             Ok(json) => match App::write_list_to_file(&json) {
