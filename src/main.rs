@@ -45,7 +45,14 @@ fn help_info() {
     G - Select last task in list
     h - Deselect current task
     CTRL s - Save list
+    CTRL e - Enter editing mode
+    CTRL v - Enter viewing mode
     ENTER - Toggle item as complete or todo
+
+    (While in editing mode)
+    CTRL c - Stop editing text
+    i - insert text
+    TAB - change windows
 
     Lists are stored in json form.
     To load a list on start up, add the file to args");

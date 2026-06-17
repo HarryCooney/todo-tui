@@ -31,9 +31,7 @@ impl Widget for &mut app::App {
 impl app::App {
     pub fn render(&mut self, frame: &mut Frame) {
         frame.render_widget(&mut *self, frame.area());
-        //This is SO inefficient but I'm not sure how else to get the areas for the info and title
-        //tabs so this will have to do.
-        self.render_cursor(frame.area(), frame);
+        //self.render_cursor(frame.area(), frame);
     }
     fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered();
@@ -66,6 +64,8 @@ impl app::App {
         self.render_tab_info(tab_info_layout, buf);
     }
 
+    //TODO: Implement later once I figure out a better system.
+    /*
     fn render_cursor(&mut self, input_area: Rect, frame: &mut Frame) {
         let frame_area = Layout::default()
             .direction(Direction::Vertical)
@@ -101,6 +101,7 @@ impl app::App {
             _ => {}
         }
     }
+    */
 
     fn calculate_y_pos_for_info(&self) -> u16 {
         (self.editor.char_index / 60 + 4) as u16

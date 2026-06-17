@@ -52,8 +52,6 @@ impl Editor {
         }
     }
 
-    //TODO Add function to change input in info_input and title_input into task structs
-
     pub fn insert_char(&mut self, input_char: char) {
         let index = self.char_index;
         match self.currently_editing {
