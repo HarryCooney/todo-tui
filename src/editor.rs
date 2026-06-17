@@ -69,6 +69,19 @@ impl Editor {
         self.reset_cursor();
     }
 
+    pub fn cursor_to_end(&mut self) {
+        match self.currently_editing {
+            CurrentlyEditing::Title => {
+                let cursor_pos = self.title_input.chars().count();
+                self.char_index = self.clamp_cursor(cursor_pos);
+            },
+            CurrentlyEditing::Info => {
+                let cursor_pos = self.info_input.chars().count();
+                self.char_index = self.clamp_cursor(cursor_pos);
+            }
+        }
+    }
+
     fn clamp_cursor(&mut self, cursor_pos: usize) -> usize {
         match self.currently_editing {
             CurrentlyEditing::Title => {

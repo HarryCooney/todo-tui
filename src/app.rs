@@ -14,7 +14,7 @@ use crate::ui;
 pub struct App {
     pub list: TodoList,
     pub task_buffer: TaskBuffer,
-    //Might have to change this later if I chage how it works
+    //Might have to change this later if I change how it works
     //Keep simple for now, allow for scalability
     pub command_message: String,
     pub editor: Editor,
@@ -89,17 +89,7 @@ impl TodoList {
             self.items.remove(i);
         }
     }
-    /*
-     * If the item being displayed is deleted, display the next item that is selected
-     * If there is only one item in the list and it is deleted, set list.selected to None
-     * Then, flush task buffer
-     * Should all of the logic be in this?
-    */
 
-    #[allow(dead_code)]
-    fn add_task(&mut self) {
-
-    }
     ///Returns the TodoItem at a given index
     fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
         self.items.get_mut(i)
@@ -134,7 +124,7 @@ impl TodoItem {
             status
         }
     }
-    
+
     fn change_status(&mut self) {
         match self.status {
             Status::Todo => self.status = Status::Complete,
@@ -214,10 +204,6 @@ impl App {
         }
     }
 
-    //TODO (Things todo might not necessarily be in this method, could also be in
-    //command_editing method)
-    //Add binds for setting normal mode
-    //add binds for inserting and deleting chars
     fn handle_editor_events(&mut self, key_event: &KeyEvent) {
         match self.editor.input_mode {
             InputMode::Normal => {
@@ -226,7 +212,10 @@ impl App {
                     KeyCode::Char('h') => self.editor.move_cursor_left(),
                     KeyCode::Char('l') => self.editor.move_cursor_right(),
                     KeyCode::Tab => self.editor.switch_editing(),
-                    KeyCode::Char('i') => self.editor.input_mode = InputMode::Editing,
+                    KeyCode::Char('i') => {
+                        self.editor.input_mode = InputMode::Editing;
+                        self.editor.cursor_to_end();
+                    },
                     _ => {}
                 }
             },
@@ -273,7 +262,7 @@ impl App {
                     if let Some(i) = self.task_buffer.current_task {
                         self.list.items[i].name = self.editor.title_input.clone();
                         self.list.items[i].info = self.editor.info_input.clone();
-                    }
+                    };
                 }
             },
             InputMode::Editing => {
@@ -284,9 +273,19 @@ impl App {
         }
     }
 
+    fn create_new_task(&mut self) {
+        self.list.items.push(TodoItem::new("Task", "", Status::Todo));
+        let idx = self.list.items.len() - 1;
+        self.update_task_buffer(Some(idx));
+        self.switch_mode(Mode::Editing);
+    }
+
     fn handle_commands_viewer_events(&mut self, key_event: &KeyEvent) {
         match key_event.code {
-            KeyCode::Char('s') => self.save_list(),
+            KeyCode::Char('s') => {
+                self.save_list();
+                self.write_command_message("List saved");
+            },
             //When you start editing, the task buffer is loaded into the editor as the info to be
             //edited.
             KeyCode::Char('e') => {
@@ -294,12 +293,20 @@ impl App {
                 self.editor.title_input = self.task_buffer.task_name.clone();
                 self.editor.info_input = self.task_buffer.task_info.clone();
             },
+            KeyCode::Char('a') => {
+                self.create_new_task();
+                self.select_last();
+            },
             _ => {}
         }
     }
 
     fn handle_commands_file_view_events(&mut self, key_event: &KeyEvent) {
+            
+    }
 
+    fn write_command_message(&mut self, message: &str) {
+        self.command_message = message.to_owned();
     }
 
     fn switch_mode(&mut self, mode: Mode) {
@@ -426,6 +433,7 @@ impl From<&TodoItem> for ListItem<'_> {
 }
 
 impl TaskBuffer {
+    ///Decrements the index of the task in TaskBuffer
     fn decrement_current_task(&mut self) {
         if let Some(i) = self.current_task {
             if i == 0 {

@@ -49,7 +49,7 @@ impl app::App {
     fn render_command(&self, area: Rect, buf: &mut Buffer) {
         let padding = Block::new().padding(Padding::horizontal(1));
         //TODO change this back once testing is done
-        let message = Paragraph::new(self.editor.title_input.to_owned())
+        let message = Paragraph::new(self.command_message.to_owned())
             .block(padding);
         message.render(area, buf);
     }
@@ -111,13 +111,13 @@ impl app::App {
         if let app::Mode::Editing = self.mode {
             match self.editor.currently_editing {
                 CurrentlyEditing::Title => {
-                    let block = Block::bordered().padding(Padding::horizontal(2)).on_dark_gray();
+                    let block = Block::bordered().padding(Padding::horizontal(1)).on_dark_gray();
                     Paragraph::new(self.editor.title_input.to_owned())
                         .wrap(Wrap {trim: true})
                         .block(block).render(area, buf);
                 },
                 CurrentlyEditing::Info => {
-                    let block = Block::bordered().padding(Padding::horizontal(2));
+                    let block = Block::bordered().padding(Padding::horizontal(1));
                     Paragraph::new(self.editor.title_input.to_owned())
                         .wrap(Wrap {trim: true})
                         .block(block).render(area, buf)
