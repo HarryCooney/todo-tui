@@ -103,10 +103,6 @@ impl app::App {
     }
     */
 
-    fn calculate_y_pos_for_info(&self) -> u16 {
-        (self.editor.char_index / 60 + 4) as u16
-    }
-
     fn render_tab_title(&self, area: Rect, buf: &mut Buffer) {
         if let app::Mode::Editing = self.mode {
             match self.editor.currently_editing {

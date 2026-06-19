@@ -3,12 +3,10 @@ use std::process;
 use serde::{Deserialize, Serialize};
 use color_eyre::Result;
 use serde_json::Error;
-use std::io::{self, BufReader};
-use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifiers};
+use std::io::{BufReader};
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
-use crate::editor::{Editor, InputMode};
-use crate::ui;
+use crate::editor::{Editor};
 
 #[derive(Debug)]
 pub struct App {
@@ -70,7 +68,7 @@ impl FromIterator<(&'static str, &'static str, Status)> for TodoList {
 
 impl TodoList {
     #[allow(dead_code)]
-    fn default() -> Self {
+    pub fn default() -> Self {
         TodoList {
             items: Vec::new(),
             state: ListState::default()
@@ -81,7 +79,7 @@ impl TodoList {
     ///
     ///The edge case which has to be accounted for is if there are no
     ///items left after a deletion. In this case, ListState is set to none.
-    fn remove_task(&mut self, i: Option<usize>) {
+    pub fn remove_task(&mut self, i: Option<usize>) {
         if let Some(i) = i {
             if self.items.len() == 1 {
                 self.state.select(None);
@@ -91,7 +89,7 @@ impl TodoList {
     }
 
     ///Returns the TodoItem at a given index
-    fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
+    pub fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
         self.items.get_mut(i)
    }
 
@@ -117,7 +115,7 @@ impl TodoList {
 }
 
 impl TodoItem {
-    fn new(name: &str, info: &str, status: Status) -> Self {
+    pub fn new(name: &str, info: &str, status: Status) -> Self {
         TodoItem {
             name: name.to_string(),
             info: info.to_string(),
@@ -125,7 +123,7 @@ impl TodoItem {
         }
     }
 
-    fn change_status(&mut self) {
+    pub fn change_status(&mut self) {
         match self.status {
             Status::Todo => self.status = Status::Complete,
             Status::Complete => self.status = Status::Todo
@@ -173,143 +171,17 @@ impl App {
         Ok(())
     }
 
-
-    /// Handles all keyboard inputs
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_events(&key_event);
-            },
-            _ => {}
-        }
-        Ok(())
-    }
-
-    ///Handles all keyboard inputs.
-    ///Inputs are seperated based on the app mode for ease of readability
-    fn handle_key_events(&mut self, key_event: &KeyEvent) {
-        if key_event.modifiers == KeyModifiers::CONTROL {
-            match self.mode {
-                Mode::Viewing => self.handle_commands_viewer_events(key_event),
-                Mode::Editing => self.handle_commands_editor_events(key_event),
-                Mode::SelectingFile => self.handle_commands_file_view_events(key_event)
-            }
-        }
-        else {
-            match self.mode {
-                Mode::Viewing => self.handle_viewing_events(key_event),
-                Mode::Editing => self.handle_editor_events(key_event),
-                Mode::SelectingFile => {}
-            }
-        }
-    }
-
-    fn handle_editor_events(&mut self, key_event: &KeyEvent) {
-        match self.editor.input_mode {
-            InputMode::Normal => {
-                match key_event.code {
-                    KeyCode::Char('q') => self.quit(),
-                    KeyCode::Char('h') => self.editor.move_cursor_left(),
-                    KeyCode::Char('l') => self.editor.move_cursor_right(),
-                    KeyCode::Tab => self.editor.switch_editing(),
-                    KeyCode::Char('i') => {
-                        self.editor.input_mode = InputMode::Editing;
-                        self.editor.cursor_to_end();
-                    },
-                    _ => {}
-                }
-            },
-            InputMode::Editing => {
-                match key_event.code {
-                    KeyCode::Char(to_insert) => self.editor.insert_char(to_insert),
-                    KeyCode::Backspace => self.editor.delete_char(),
-                    KeyCode::Enter => self.editor.insert_char('\n'),
-                    KeyCode::Tab => self.editor.insert_char('\t'),
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    //TODO This will be used when the file viewer is added
-    fn handle_file_view_events(&mut self, key_event: &KeyEvent) {
-
-    }
-
-    fn handle_viewing_events(&mut self, key_event: &KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.quit(),
-            KeyCode::Char('j') => self.select_next(),
-            KeyCode::Char('k') => self.select_previous(),
-            KeyCode::Char('g') => self.select_first(),
-            KeyCode::Char('G') => self.select_last(),
-            KeyCode::Char('h') => self.select_none(),
-            KeyCode::Enter => self.handle_enter(),
-            KeyCode::Char('x') => self.remove_task(),
-            _ => {}
-        }
-    }
-
-    fn handle_commands_editor_events(&mut self, key_event: &KeyEvent) {
-        match self.editor.input_mode {
-            InputMode::Normal => {
-                //When mode is switched to viewing, changes are saved from editor to the task which
-                //was being edited (if it exists)
-                if let KeyCode::Char('v') = key_event.code {
-                    self.switch_mode(Mode::Viewing);
-                    self.task_buffer.task_name = self.editor.title_input.clone();
-                    self.task_buffer.task_info = self.editor.info_input.clone();
-                    if let Some(i) = self.task_buffer.current_task {
-                        self.list.items[i].name = self.editor.title_input.clone();
-                        self.list.items[i].info = self.editor.info_input.clone();
-                    };
-                }
-            },
-            InputMode::Editing => {
-                if let KeyCode::Char('c') = key_event.code {
-                    self.editor.input_mode = InputMode::Normal;
-                }
-            }
-        }
-    }
-
-    fn create_new_task(&mut self) {
+    pub fn create_new_task(&mut self) {
         self.list.items.push(TodoItem::new("Task", "", Status::Todo));
         let idx = self.list.items.len() - 1;
         self.update_task_buffer(Some(idx));
         self.switch_mode(Mode::Editing);
     }
-
-    fn handle_commands_viewer_events(&mut self, key_event: &KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('s') => {
-                self.save_list();
-                self.write_command_message("List saved");
-            },
-            //When you start editing, the task buffer is loaded into the editor as the info to be
-            //edited.
-            KeyCode::Char('e') => {
-                self.switch_mode(Mode::Editing);
-                self.editor.title_input = self.task_buffer.task_name.clone();
-                self.editor.info_input = self.task_buffer.task_info.clone();
-            },
-            KeyCode::Char('a') => {
-                self.create_new_task();
-                self.select_last();
-            },
-            _ => {}
-        }
-    }
-
-    fn handle_commands_file_view_events(&mut self, key_event: &KeyEvent) {
-            
-    }
-
-    fn write_command_message(&mut self, message: &str) {
+    pub fn write_command_message(&mut self, message: &str) {
         self.command_message = message.to_owned();
     }
 
-    fn switch_mode(&mut self, mode: Mode) {
+    pub fn switch_mode(&mut self, mode: Mode) {
         match mode {
             Mode::Viewing => self.mode = Mode::Viewing,
             Mode::Editing => self.mode = Mode::Editing,
@@ -317,7 +189,7 @@ impl App {
         }
     }
     
-    fn quit(&mut self) {
+    pub fn quit(&mut self) {
         self.running = false;
     }
 
@@ -327,9 +199,8 @@ impl App {
     ///If there is only one item left in TodoList, wipe TB and TL
     ///If the TB = currently selected and is the last item, decrement both
     ///If the task in TB is a larger index than what is being deleted,
-    ///decrement current_task in TB.
     ///Otherwise, just remove task and don't update TB at all.
-    fn remove_task(&mut self) {
+    pub fn remove_task(&mut self) {
         if self.list.state.selected() == Some(0) {
             self.list.remove_task(self.list.state.selected());
             self.update_task_buffer(self.list.state.selected());
@@ -355,7 +226,7 @@ impl App {
     ///This information is used to render the info tab.
     ///The buffer is only updated if the index of the current TodoItem in TodoList
     ///Doesn't match the item in the buffer. This saves having to clone on each frame.
-    fn update_task_buffer(&mut self, i: Option<usize>) {
+    pub fn update_task_buffer(&mut self, i: Option<usize>) {
         match i {
             Some(i) => {
                 self.task_buffer.task_name = self.list.items[i].name.to_owned();
@@ -369,32 +240,22 @@ impl App {
             }
         }
     }
-
-    fn handle_enter(&mut self) {
-        //If the task being selected is the task in task_buffer, It will change status
-        if self.task_buffer.current_task == self.list.state.selected() {
-            self.change_status();
-        } else {
-            self.update_task_buffer(self.list.state.selected());
-        }
-    }
-
-    fn select_first(&mut self) {
+    pub fn select_first(&mut self) {
         self.list.state.select_first();
     }
-    fn select_last(&mut self) {
+    pub fn select_last(&mut self) {
         self.list.state.select_last();
     }
-    fn select_next(&mut self) {
+    pub fn select_next(&mut self) {
         self.list.state.select_next();
     }
-    fn select_previous(&mut self) {
+    pub fn select_previous(&mut self) {
         self.list.state.select_previous();
     }
-    fn select_none(&mut self) {
+    pub fn select_none(&mut self) {
         self.list.state.select(None);
     }
-    fn change_status(&mut self) {
+    pub fn change_status(&mut self) {
         if let Some(i) = self.list.state.selected() {
             match self.list.get_item(i) {
                 Some(item) => {
@@ -405,13 +266,13 @@ impl App {
         }
     }
 
-    fn write_list_to_file(data: &str) -> Result<()> {
+    pub fn write_list_to_file(data: &str) -> Result<()> {
          let file = "test.json";
          fs::write(file, data)?;
          Ok(())
     }
 
-    fn save_list(&mut self) {
+    pub fn save_list(&mut self) {
         match self.list.serialize() {
             Ok(json) => match App::write_list_to_file(&json) {
                 Ok(()) => self.command_message = String::from("List saved"),
@@ -434,7 +295,7 @@ impl From<&TodoItem> for ListItem<'_> {
 
 impl TaskBuffer {
     ///Decrements the index of the task in TaskBuffer
-    fn decrement_current_task(&mut self) {
+    pub fn decrement_current_task(&mut self) {
         if let Some(i) = self.current_task {
             if i == 0 {
                 self.current_task = None;

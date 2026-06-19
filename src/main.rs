@@ -4,6 +4,7 @@ use std::process;
 mod app;
 mod ui;
 mod editor;
+mod key_events;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
