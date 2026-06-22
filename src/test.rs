@@ -1,4 +1,9 @@
 #[cfg(test)]
 mod test {
-    
+    use super::*;
+
+    #[test]
+    fn test_mount_storage() -> Result<()> {
+
+    }
 }

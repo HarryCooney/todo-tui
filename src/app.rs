@@ -175,8 +175,8 @@ impl App {
         self.list.items.push(TodoItem::new("Task", "", Status::Todo));
         let idx = self.list.items.len() - 1;
         self.update_task_buffer(Some(idx));
-        self.switch_mode(Mode::Editing);
     }
+
     pub fn write_command_message(&mut self, message: &str) {
         self.command_message = message.to_owned();
     }

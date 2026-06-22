@@ -5,6 +5,7 @@ mod app;
 mod ui;
 mod editor;
 mod key_events;
+mod file_viewer;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
