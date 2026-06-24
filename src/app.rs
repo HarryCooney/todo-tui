@@ -7,6 +7,7 @@ use std::io::{BufReader};
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
 use crate::editor::{Editor};
+use crate::file_viewer::File_Viewer;
 
 #[derive(Debug)]
 pub struct App {
@@ -14,8 +15,9 @@ pub struct App {
     pub task_buffer: TaskBuffer,
     //Might have to change this later if I change how it works
     //Keep simple for now, allow for scalability
-    pub command_message: String,
     pub editor: Editor,
+    pub file_viewer: File_Viewer,
+    pub command_message: String,
     pub mode: Mode,
     pub running: bool
 }
@@ -155,6 +157,7 @@ impl Default for App {
             task_buffer: TaskBuffer::default(),
             command_message: String::from(""),
             editor: Editor::default(),
+            file_viewer: File_Viewer::default(),
             mode: Mode::Viewing,
             running: false,
         }
@@ -240,6 +243,7 @@ impl App {
             }
         }
     }
+
     pub fn select_first(&mut self) {
         self.list.state.select_first();
     }
