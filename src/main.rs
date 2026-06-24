@@ -1,6 +1,7 @@
 use std::env::args;
 use color_eyre::Result;
 use std::process;
+use std::path::Path;
 mod app;
 mod ui;
 mod editor;
@@ -62,5 +63,6 @@ fn help_info() {
 }
 
 fn import_json_file(file_name: &str, app: &mut app::App) -> Result<()> {
-    app.list.read_list_from_file(file_name)
+    let path = Path::new(file_name);
+    app.list.read_list_from_file(path)
 }

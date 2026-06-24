@@ -31,19 +31,30 @@ impl Widget for &mut app::App {
 impl app::App {
     pub fn render(&mut self, frame: &mut Frame) {
         frame.render_widget(&mut *self, frame.area());
-        //self.render_cursor(frame.area(), frame);
     }
     fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered();
-        let list_items: Vec<ListItem> = self.list
-            .items
-            .iter()
-            .map(|item| ListItem::from(item))
-            .collect();
-        let list = List::new(list_items)
-            .block(block)
-            .highlight_symbol("> ");
-        StatefulWidget::render(list, area, buf, &mut self.list.state);
+
+        match self.mode {
+            app::Mode::SelectingFile => {
+                let list_items: Vec<String> = self.file_viewer.files.clone();
+                let list = List::new(list_items)
+                    .block(block)
+                    .highlight_symbol("> ");
+                StatefulWidget::render(list, area, buf, &mut self.file_viewer.state);
+            },
+            _ => {
+                let list_items: Vec<ListItem> = self.list
+                    .items
+                    .iter()
+                    .map(|item| ListItem::from(item))
+                    .collect();
+                let list = List::new(list_items)
+                    .block(block)
+                    .highlight_symbol("> ");
+                StatefulWidget::render(list, area, buf, &mut self.list.state);
+            }
+        }
     }
 
     fn render_command(&self, area: Rect, buf: &mut Buffer) {

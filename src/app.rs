@@ -6,6 +6,7 @@ use serde_json::Error;
 use std::io::{BufReader};
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
+use std::path::Path;
 use crate::editor::{Editor};
 use crate::file_viewer::File_Viewer;
 
@@ -101,7 +102,7 @@ impl TodoList {
         serde_json::to_string_pretty(&self.items)
     }
     
-    pub fn read_list_from_file(&mut self, file_name: &str) -> Result<()> {
+    pub fn read_list_from_file(&mut self, file_name: &Path) -> Result<()> {
         match File::open(file_name) {
             Ok(file) => {
                 let reader = BufReader::new(file);
@@ -212,7 +213,7 @@ impl App {
         && self.list.state.selected() == Some(self.list.items.len() - 1) {
 
             self.list.remove_task(self.list.state.selected());
-            self.select_previous();
+            self.select_previous(Mode::Viewing);
             self.update_task_buffer(self.list.state.selected());
         }
         else if self.list.state.selected() < self.task_buffer.current_task {
@@ -244,21 +245,44 @@ impl App {
         }
     }
 
-    pub fn select_first(&mut self) {
-        self.list.state.select_first();
+    pub fn select_first(&mut self, mode: Mode) {
+        match mode {
+            Mode::Viewing => self.list.state.select_first(),
+            Mode::SelectingFile => self.file_viewer.state.select_first(),
+            _ => {}
+        }
     }
-    pub fn select_last(&mut self) {
-        self.list.state.select_last();
+    pub fn select_last(&mut self, mode: Mode) {
+        match mode {
+            Mode::Viewing => self.list.state.select_last(),
+            Mode::SelectingFile => self.file_viewer.state.select_last(),
+            _ => {}
+        }
     }
-    pub fn select_next(&mut self) {
+    pub fn select_next(&mut self, mode: Mode) {
+
+        match mode {
+            Mode::Viewing => self.list.state.select_next(),
+            Mode::SelectingFile => self.file_viewer.state.select_next(),
+            _ => {}
+        }
         self.list.state.select_next();
     }
-    pub fn select_previous(&mut self) {
-        self.list.state.select_previous();
+    pub fn select_previous(&mut self, mode: Mode) {
+        match mode {
+            Mode::Viewing => self.list.state.select_previous(),
+            Mode::SelectingFile => self.file_viewer.state.select_previous(),
+            _ => {}
+        }
     }
-    pub fn select_none(&mut self) {
-        self.list.state.select(None);
+    pub fn select_none(&mut self, mode: Mode) {
+        match mode {
+            Mode::Viewing => self.list.state.select(None),
+            Mode::SelectingFile => self.file_viewer.state.select(None),
+            _ => {}
+        }
     }
+
     pub fn change_status(&mut self) {
         if let Some(i) = self.list.state.selected() {
             match self.list.get_item(i) {
@@ -271,7 +295,7 @@ impl App {
     }
 
     pub fn write_list_to_file(data: &str) -> Result<()> {
-         let file = "test.json";
+         let file = "./lists/test.json";
          fs::write(file, data)?;
          Ok(())
     }
