@@ -91,6 +91,13 @@ impl TodoList {
         }
     }
 
+    //TODO
+    //Add ability to delete a file while in file search mode
+
+    //TODO
+    //change how saving file works so that the user is asked to input the file name when they want
+    //to save if the file doesn't exist
+
     ///Returns the TodoItem at a given index
     pub fn get_item(&mut self, i: usize) -> Option<&mut TodoItem> {
         self.items.get_mut(i)
