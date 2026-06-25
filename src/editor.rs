@@ -7,13 +7,13 @@ pub struct Editor {
     pub currently_editing: CurrentlyEditing
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InputMode {
     Normal,
     Editing
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CurrentlyEditing {
     Title,
     Info
@@ -27,7 +27,8 @@ impl Editor {
             self.char_index = self.clamp_cursor(self.char_index.saturating_sub(1));
     }
 
-    fn reset_cursor(&mut self) {
+    #[allow(dead_code)]
+    pub fn reset_cursor(&mut self) {
         self.char_index = 0;     
     }
 
@@ -66,7 +67,7 @@ impl Editor {
             CurrentlyEditing::Title => self.currently_editing = CurrentlyEditing::Info,
             CurrentlyEditing::Info => self.currently_editing = CurrentlyEditing::Title,
         }
-        self.reset_cursor();
+        self.cursor_to_end();
     }
 
     pub fn cursor_to_end(&mut self) {

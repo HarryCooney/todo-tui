@@ -8,6 +8,9 @@ mod editor;
 mod key_events;
 mod file_viewer;
 
+#[cfg(test)]
+mod tests;
+
 fn main() -> Result<()> {
     color_eyre::install()?;
     let args:Vec<String> = args().collect();
@@ -50,12 +53,14 @@ fn help_info() {
     CTRL s - Save list
     CTRL e - Enter editing mode
     CTRL v - Enter viewing mode
-    ENTER - Toggle item as complete or todo
+    CTRL o - Select todo list
+    ENTER - Select item / toggle complete for todo item
 
     (While in editing mode)
     CTRL c - Stop editing text
     i - insert text
     TAB - change windows
+
 
     Lists are stored in json form.
     To load a list on start up, add the file to args");

@@ -29,7 +29,7 @@ pub struct TodoList {
     pub state: ListState
 }
 
-#[derive(Debug, Serialize,Deserialize)]
+#[derive(Debug, PartialEq, Serialize,Deserialize)]
 pub struct TodoItem {
     pub name: String,
     pub info: String,
@@ -43,7 +43,7 @@ pub struct TaskBuffer {
     pub current_task: Option<usize>
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum Status {
     Todo,
     Complete
@@ -103,8 +103,6 @@ impl TodoList {
         self.items.get_mut(i)
    }
 
-    //TODO
-    //Test this
     pub fn serialize(&self) -> Result<String, Error> {
         serde_json::to_string_pretty(&self.items)
     }
@@ -340,3 +338,5 @@ impl TaskBuffer {
         }
     }
 }
+
+
