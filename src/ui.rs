@@ -9,29 +9,49 @@ use crate::editor::{Editor, InputMode, CurrentlyEditing};
 
 impl Widget for &mut app::App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-
-        let frame_area = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(1)
-            ]).split(area);
-        let main_area = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(40),
-                Constraint::Fill(1)
-            ]).split(frame_area[0]);
-        let command_area = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Fill(1),
-                Constraint::Length(20)
-            ]).split(frame_area[1]);
-        self.render_list(main_area[0], buf);
-        self.render_tab(main_area[1], buf);
-        self.render_command(command_area[0], buf);
-        self.render_mode(command_area[1], buf);
+        match self.mode {
+            app::Mode::SavingFile => {
+                let frame_area = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Length(1)
+                    ]).split(area);
+                let command_area = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Length(20)
+                    ]).split(frame_area[1]);
+                self.render_file_saving_popup(frame_area[0], buf);
+                self.render_command(command_area[0], buf);
+                self.render_mode(command_area[1], buf);
+            },
+            _ => {
+                let frame_area = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Length(1)
+                    ]).split(area);
+                let main_area = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Length(40),
+                        Constraint::Fill(1)
+                    ]).split(frame_area[0]);
+                let command_area = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([
+                        Constraint::Fill(1),
+                        Constraint::Length(20)
+                    ]).split(frame_area[1]);
+                self.render_list(main_area[0], buf);
+                self.render_tab(main_area[1], buf);
+                self.render_command(command_area[0], buf);
+                self.render_mode(command_area[1], buf);
+            }
+        }
     }
 }
 
@@ -40,6 +60,17 @@ impl app::App {
     pub fn render(&mut self, frame: &mut Frame) {
         frame.render_widget(&mut *self, frame.area());
     }
+
+    fn render_file_saving_popup(&self, area: Rect, buf: &mut Buffer) {
+        let inner_block = Block::bordered()
+            .title("File Name");
+        let text = Paragraph::new(self.editor.file_name_input.clone())
+            .alignment(Alignment::Center)
+            .block(inner_block);
+        text.render(area, buf);
+
+    }
+
     fn render_list(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered();
 
@@ -70,7 +101,8 @@ impl app::App {
         match self.mode {
             app::Mode::Viewing => mode_message = String::from("-- VIEWING --"),
             app::Mode::Editing => mode_message = String::from("-- EDITING --"),
-            app::Mode::SelectingFile => mode_message = String::from("-- FILES --")
+            app::Mode::SelectingFile => mode_message = String::from("-- FILES --"),
+            app::Mode::SavingFile => mode_message = String::from("-- SAVING LIST --"),
         }
         let padding = Block::new().padding(Padding::horizontal(1));
         let mode = Paragraph::new(mode_message).alignment(Alignment::Right)
@@ -150,7 +182,8 @@ impl app::App {
                         .wrap(Wrap {trim: true})
                         .block(block).render(area, buf)
 
-                }
+                },
+                CurrentlyEditing::FileName => {}
             }
         }
         else {
@@ -181,7 +214,8 @@ impl app::App {
                         .wrap(Wrap {trim: true})
                         .block(block).render(area, buf)
 
-                }
+                },
+                CurrentlyEditing::FileName => {}
             }
         }
         else {

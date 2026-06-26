@@ -3,7 +3,7 @@ use std::process;
 use serde::{Deserialize, Serialize};
 use color_eyre::Result;
 use serde_json::Error;
-use std::io::{BufReader};
+use std::io::BufReader;
 use ratatui::widgets::{ListItem, ListState};
 use std::fs::{self, File};
 use std::path::Path;
@@ -53,7 +53,8 @@ pub enum Status {
 pub enum Mode {
     Editing,
     Viewing,
-    SelectingFile
+    SelectingFile,
+    SavingFile
 }
 
 impl FromIterator<(&'static str, &'static str, Status)> for TodoList {
@@ -194,7 +195,8 @@ impl App {
         match mode {
             Mode::Viewing => self.mode = Mode::Viewing,
             Mode::Editing => self.mode = Mode::Editing,
-            Mode::SelectingFile => self.mode = Mode::SelectingFile
+            Mode::SelectingFile => self.mode = Mode::SelectingFile,
+            Mode::SavingFile => self.mode = Mode::SavingFile
         }
     }
     
@@ -299,20 +301,27 @@ impl App {
         }
     }
 
-    pub fn write_list_to_file(data: &str) -> Result<()> {
-         let file = "./lists/test.json";
-         fs::write(file, data)?;
-         Ok(())
+    pub fn write_list_to_file(data: &str, file_name: &str) -> Result<()> {
+        let path_text = format!("./lists/{}.json", file_name);
+        let path = Path::new(path_text.as_str());
+        fs::write(path, data)?;
+        Ok(())
     }
 
-    pub fn save_list(&mut self) {
+    pub fn save_list(&mut self, file_name: String) {
+        if file_name.contains(".") || file_name.contains("/") {
+            self.command_message = String::from("File name contains invalid characters");
+            return;
+        }
+
         match self.list.serialize() {
-            Ok(json) => match App::write_list_to_file(&json) {
+            Ok(json) => match App::write_list_to_file(&json, file_name.as_str()) {
                 Ok(()) => self.command_message = String::from("List saved"),
                 Err(_) => self.command_message = String::from("Error: Save file failed")
             },
             Err(_) => self.command_message = String::from("Error: Save file failed")
         }
+        self.switch_mode(Mode::Viewing);
     }
 }
 

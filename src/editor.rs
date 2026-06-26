@@ -2,6 +2,7 @@
 pub struct Editor {
     pub title_input: String,
     pub info_input: String,
+    pub file_name_input: String,
     pub char_index: usize,
     pub input_mode: InputMode,
     pub currently_editing: CurrentlyEditing
@@ -16,7 +17,8 @@ pub enum InputMode {
 #[derive(Debug, PartialEq)]
 pub enum CurrentlyEditing {
     Title,
-    Info
+    Info,
+    FileName
 }
 
 impl Editor {
@@ -47,6 +49,11 @@ impl Editor {
                     let before = self.info_input.chars().take(new_index);
                     let after = self.info_input.chars().skip(new_index + 1);
                     self.info_input = before.chain(after).collect()
+                },
+                CurrentlyEditing::FileName => {
+                    let before = self.file_name_input.chars().take(new_index);
+                    let after = self.file_name_input.chars().skip(new_index + 1);
+                    self.file_name_input = before.chain(after).collect()
                 }
             }
             self.move_cursor_left();
@@ -57,7 +64,8 @@ impl Editor {
         let index = self.char_index;
         match self.currently_editing {
             CurrentlyEditing::Title  => self.title_input.insert(index, input_char),
-            CurrentlyEditing::Info =>  self.info_input.insert(index, input_char)
+            CurrentlyEditing::Info =>  self.info_input.insert(index, input_char),
+            CurrentlyEditing::FileName => self.file_name_input.insert(index, input_char)
         }
         self.move_cursor_right();
     }
@@ -66,6 +74,7 @@ impl Editor {
         match self.currently_editing {
             CurrentlyEditing::Title => self.currently_editing = CurrentlyEditing::Info,
             CurrentlyEditing::Info => self.currently_editing = CurrentlyEditing::Title,
+            _ => {}
         }
         self.cursor_to_end();
     }
@@ -79,18 +88,19 @@ impl Editor {
             CurrentlyEditing::Info => {
                 let cursor_pos = self.info_input.chars().count();
                 self.char_index = self.clamp_cursor(cursor_pos);
+            },
+            CurrentlyEditing::FileName => {
+                let cursor_pos = self.file_name_input.chars().count();
+                self.char_index = self.clamp_cursor(cursor_pos);
             }
         }
     }
 
     fn clamp_cursor(&mut self, cursor_pos: usize) -> usize {
         match self.currently_editing {
-            CurrentlyEditing::Title => {
-                cursor_pos.clamp(0, self.title_input.chars().count())
-            },
-            CurrentlyEditing::Info => {
-                cursor_pos.clamp(0, self.info_input.chars().count())
-            }
+            CurrentlyEditing::Title => cursor_pos.clamp(0, self.title_input.chars().count()),
+            CurrentlyEditing::Info => cursor_pos.clamp(0, self.info_input.chars().count()),
+            CurrentlyEditing::FileName => cursor_pos.clamp(0, self.file_name_input.chars().count())
         }
     }
 
@@ -98,6 +108,7 @@ impl Editor {
         Editor {
             title_input: String::from(""),
             info_input: String:: from(""),
+            file_name_input: String::from(""),
             char_index: 0,
             input_mode: InputMode::Normal,
             currently_editing: CurrentlyEditing::Title

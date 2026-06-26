@@ -1,6 +1,6 @@
 use std::io::{self};
 use crate::app::{Mode, App};
-use crate::editor::{InputMode};
+use crate::editor::{InputMode, CurrentlyEditing};
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind, KeyCode, KeyModifiers};
 use std::path::Path;
 
@@ -23,16 +23,59 @@ impl App {
             match self.mode {
                 Mode::Viewing => self.handle_commands_viewer_events(key_event),
                 Mode::Editing => self.handle_commands_editor_events(key_event),
-                Mode::SelectingFile => self.handle_commands_selecting_file_events(key_event)
+                Mode::SelectingFile => self.handle_commands_selecting_file_events(key_event),
+                Mode::SavingFile => self.handle_commands_saving_file_events(key_event)
             }
         }
         else {
             match self.mode {
                 Mode::Viewing => self.handle_viewing_events(key_event),
                 Mode::Editing => self.handle_editor_events(key_event),
-                Mode::SelectingFile => self.handle_selecting_file_events(key_event)
+                Mode::SelectingFile => self.handle_selecting_file_events(key_event),
+                Mode::SavingFile => self.handle_saving_file_events(key_event)
             }
         }
+    }
+
+    pub fn handle_commands_saving_file_events(&mut self, key_event: &KeyEvent) {
+        match self.editor.input_mode {
+            InputMode::Normal => {
+                match key_event.code {
+                    _ => {}
+                }
+            },
+            InputMode::Editing => {
+                match key_event.code {
+                    KeyCode::Char('c') => self.editor.input_mode = InputMode::Normal,
+                    _ => {}
+                }
+            }
+        }
+    }
+    pub fn handle_saving_file_events(&mut self, key_event: &KeyEvent) {
+        match self.editor.input_mode {
+            InputMode::Editing => {
+                match key_event.code {
+                    KeyCode::Char(to_insert) => self.editor.insert_char(to_insert),
+                    KeyCode::Backspace => self.editor.delete_char(),
+                    KeyCode::Enter => self.handle_enter_saving_file(),
+                    KeyCode::Tab => self.editor.insert_char('\t'),
+                    _ => {}
+                }
+            },
+            InputMode::Normal => {
+                match key_event.code {
+                    KeyCode::Char('i') => self.editor.input_mode = InputMode::Editing,
+                    KeyCode::Char('q') => self.quit(),
+                    KeyCode::Enter => self.handle_enter_saving_file(),
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub fn handle_enter_saving_file(&mut self) {
+        self.save_list(self.editor.file_name_input.clone());
     }
 
     pub fn handle_enter_viewing(&mut self) {
@@ -50,6 +93,29 @@ impl App {
             let path = Path::new(p.as_str());
             self.list.read_list_from_file(path);
             self.switch_mode(Mode::Viewing);
+        }
+    }
+
+    pub fn handle_commands_editor_events(&mut self, key_event: &KeyEvent) {
+        match self.editor.input_mode {
+            InputMode::Normal => {
+                //When mode is switched to viewing, changes are saved from editor to the task which
+                //was being edited (if it exists)
+                if let KeyCode::Char('v') = key_event.code {
+                    self.switch_mode(Mode::Viewing);
+                    self.task_buffer.task_name = self.editor.title_input.clone();
+                    self.task_buffer.task_info = self.editor.info_input.clone();
+                    if let Some(i) = self.task_buffer.current_task {
+                        self.list.items[i].name = self.editor.title_input.clone();
+                        self.list.items[i].info = self.editor.info_input.clone();
+                    };
+                }
+            },
+            InputMode::Editing => {
+                if let KeyCode::Char('c') = key_event.code {
+                    self.editor.input_mode = InputMode::Normal;
+                }
+            }
         }
     }
 
@@ -96,8 +162,9 @@ impl App {
     pub fn handle_commands_viewer_events(&mut self, key_event: &KeyEvent) {
         match key_event.code {
             KeyCode::Char('s') => {
-                self.save_list();
-                self.write_command_message("List saved");
+                self.switch_mode(Mode::SavingFile);
+                self.editor.currently_editing = CurrentlyEditing::FileName;
+                self.editor.input_mode = InputMode::Editing
             },
             //When you start editing, the task buffer is loaded into the editor as the info to be
             //edited.
@@ -140,29 +207,6 @@ impl App {
             KeyCode::Enter => self.handle_enter_selecting_file(self.file_viewer.state.selected()),
             KeyCode::Char('x') => self.remove_task(),
             _ => {}
-        }
-    }
-
-    pub fn handle_commands_editor_events(&mut self, key_event: &KeyEvent) {
-        match self.editor.input_mode {
-            InputMode::Normal => {
-                //When mode is switched to viewing, changes are saved from editor to the task which
-                //was being edited (if it exists)
-                if let KeyCode::Char('v') = key_event.code {
-                    self.switch_mode(Mode::Viewing);
-                    self.task_buffer.task_name = self.editor.title_input.clone();
-                    self.task_buffer.task_info = self.editor.info_input.clone();
-                    if let Some(i) = self.task_buffer.current_task {
-                        self.list.items[i].name = self.editor.title_input.clone();
-                        self.list.items[i].info = self.editor.info_input.clone();
-                    };
-                }
-            },
-            InputMode::Editing => {
-                if let KeyCode::Char('c') = key_event.code {
-                    self.editor.input_mode = InputMode::Normal;
-                }
-            }
         }
     }
 }
